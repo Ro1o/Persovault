@@ -27,6 +27,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install pandas numpy scikit-learn joblib
 
+      - name: Ensure ai/ directory exists
+        run: mkdir -p ai
+
       - name: Prepare training data
         run: |
           python - <<'EOF'
@@ -35,7 +38,6 @@ jobs:
           import sqlite3
           import pandas as pd
 
-          # We are already inside backend/ as working directory
           sys.path.insert(0, ".")
 
           DB_PATH = "passport_db.sqlite"
