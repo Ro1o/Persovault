@@ -1,0 +1,122 @@
+name: Weekly AI Model Retraining
+
+on:
+  # Runs every Monday at 00:00 UTC
+  schedule:
+    - cron: "0 0 * * 1"
+
+  # Allows you to trigger it manually from GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout repo (includes passport_db.sqlite if committed)
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2. Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      # 3. Install dependencies
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy scikit-learn joblib
+
+      # 4. Combine real driver data (from SQLite) + synthetic data
+      - name: Prepare training data
+        run: |
+          python - <<'EOF'
+          import os
+          import sys
+          import sqlite3
+          import pandas as pd
+
+          sys.path.insert(0, "backend")
+
+          DB_PATH = "backend/passport_db.sqlite"
+          real_df = None
+
+          # ── Step 1: Try to read real driver behaviour from SQLite ─
+          if os.path.exists(DB_PATH):
+              try:
+                  conn = sqlite3.connect(DB_PATH)
+
+                  cursor = conn.cursor()
+                  cursor.execute("""
+                      SELECT name FROM sqlite_master
+                      WHERE type='table' AND name='driver_behaviour'
+                  """)
+
+                  table_exists = cursor.fetchone()
+
+                  if table_exists:
+                      real_df = pd.read_sql("""
+                          SELECT
+                              current_points,
+                              offences_last_12m,
+                              minor_offences,
+                              moderate_offences,
+                              severe_offences,
+                              days_since_last_offence,
+                              avg_days_between_offences,
+                              years_since_licence_issue,
+                              suspension_proximity,
+                              stability_index,
+                              trend_encoded,
+                              label
+                          FROM driver_behaviour
+                          WHERE label IS NOT NULL
+                      """, conn)
+
+                      conn.close()
+                      print(f"✅ Real driver data loaded: {len(real_df)} records.")
+                  else:
+                      conn.close()
+                      print("⚠️  driver_behaviour table not found. Using synthetic only.")
+
+              except Exception as e:
+                  print(f"⚠️  SQLite error: {e}. Using synthetic only.")
+          else:
+              print("⚠️  passport_db.sqlite not found. Using synthetic only.")
+
+          # ── Step 2: Always generate fresh synthetic data ──────────
+          print("Generating synthetic dataset...")
+          from ai.dataset_generator import generate_dataset
+          generate_dataset()
+          synthetic_df = pd.read_csv("backend/ai/synthetic_drivers.csv")
+          print(f"✅ Synthetic data generated: {len(synthetic_df)} records.")
+
+          # ── Step 3: Combine real + synthetic ─────────────────────
+          if real_df is not None and len(real_df) > 0:
+              combined_df = pd.concat([real_df, synthetic_df], ignore_index=True)
+              combined_df = combined_df.sample(frac=1, random_state=42).reset_index(drop=True)
+              combined_df.to_csv("backend/ai/synthetic_drivers.csv", index=False)
+              print(f"✅ Combined dataset saved: {len(combined_df)} total records")
+              print(f"   ├── Real data:      {len(real_df)} records")
+              print(f"   └── Synthetic data: {len(synthetic_df)} records")
+          else:
+              print(f"✅ Using synthetic data only: {len(synthetic_df)} records.")
+          EOF
+
+      # 5. Train the model
+      - name: Train model
+        run: |
+          cd backend && python ai/train_model.py
+
+      # 6. Commit and push updated model back to repo
+      - name: Commit updated model
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add backend/ai/best_model.pkl backend/ai/feature_importance.csv backend/ai/synthetic_drivers.csv
+          git diff --cached --quiet || git commit -m "chore: retrain AI model [$(date +'%Y-%m-%d')]"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
