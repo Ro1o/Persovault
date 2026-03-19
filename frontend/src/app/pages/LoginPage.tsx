@@ -37,7 +37,7 @@ function LoginForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-  alert(`Connecting to: ${API_BASE_URL}`); // ← add this temporarily
+
   
     try {
       const response = await fetch(`${API_BASE_URL}/login`, {
