@@ -9,10 +9,6 @@ jobs:
   retrain:
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: backend
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -27,9 +23,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install pandas numpy scikit-learn joblib
 
-      - name: Ensure ai/ directory exists
-        run: mkdir -p ai
-
       - name: Prepare training data
         run: |
           python - <<'EOF'
@@ -38,7 +31,12 @@ jobs:
           import sqlite3
           import pandas as pd
 
+          # Move into backend/ so all relative paths work
+          os.chdir("backend")
           sys.path.insert(0, ".")
+
+          # Ensure ai/ directory exists BEFORE importing dataset_generator
+          os.makedirs("ai", exist_ok=True)
 
           DB_PATH = "passport_db.sqlite"
           real_df = None
@@ -82,10 +80,15 @@ jobs:
           else:
               print("⚠️  passport_db.sqlite not found. Using synthetic only.")
 
-          # ── Step 2: Always generate fresh synthetic data ──────────
+          # ── Step 2: Generate synthetic data ───────────────────────
+          # Import AFTER os.makedirs so the ai/ folder exists
+          # Then patch OUTPUT_FILE to use absolute path
+          import ai.dataset_generator as dg
+          dg.OUTPUT_FILE = os.path.abspath("ai/synthetic_drivers.csv")
+
           print("Generating synthetic dataset...")
-          from ai.dataset_generator import generate_dataset
-          generate_dataset()
+          dg.generate_dataset()
+
           synthetic_df = pd.read_csv("ai/synthetic_drivers.csv")
           print(f"✅ Synthetic data generated: {len(synthetic_df)} records.")
 
@@ -102,13 +105,13 @@ jobs:
           EOF
 
       - name: Train model
-        run: python ai/train_model.py
+        run: cd backend && python ai/train_model.py
 
       - name: Commit updated model
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add ai/best_model.pkl ai/feature_importance.csv ai/synthetic_drivers.csv
+          git add backend/ai/best_model.pkl backend/ai/feature_importance.csv backend/ai/synthetic_drivers.csv
           git diff --cached --quiet || git commit -m "chore: retrain AI model [$(date +'%Y-%m-%d')]"
           git push
         env:
