@@ -23,7 +23,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install pandas numpy scikit-learn joblib
 
-      - name: Prepare training data
+      - name: Clear pycache
+        run: find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+
+      - name: Generate synthetic dataset
+        run: cd backend && python ai/dataset_generator.py
+
+      - name: Merge real data if available
         run: |
           python - <<'EOF'
           import os
@@ -31,17 +37,17 @@ jobs:
           import sqlite3
           import pandas as pd
 
-          # Move into backend/ so all relative paths work
           os.chdir("backend")
           sys.path.insert(0, ".")
 
-          # Ensure ai/ directory exists BEFORE importing dataset_generator
-          os.makedirs("ai", exist_ok=True)
-
           DB_PATH = "passport_db.sqlite"
+          SYNTHETIC_PATH = "ai/synthetic_drivers.csv"
+
+          synthetic_df = pd.read_csv(SYNTHETIC_PATH)
+          print(f"✅ Synthetic data: {len(synthetic_df)} records.")
+
           real_df = None
 
-          # ── Step 1: Try to read real driver behaviour from SQLite ─
           if os.path.exists(DB_PATH):
               try:
                   conn = sqlite3.connect(DB_PATH)
@@ -71,37 +77,24 @@ jobs:
                           WHERE label IS NOT NULL
                       """, conn)
                       conn.close()
-                      print(f"✅ Real driver data loaded: {len(real_df)} records.")
+                      print(f"✅ Real data loaded: {len(real_df)} records.")
                   else:
                       conn.close()
-                      print("⚠️  driver_behaviour table not found. Using synthetic only.")
+                      print("⚠️  driver_behaviour table not found. Skipping.")
               except Exception as e:
-                  print(f"⚠️  SQLite error: {e}. Using synthetic only.")
+                  print(f"⚠️  SQLite error: {e}. Skipping real data.")
           else:
-              print("⚠️  passport_db.sqlite not found. Using synthetic only.")
+              print("⚠️  No database found. Using synthetic only.")
 
-          # ── Step 2: Generate synthetic data ───────────────────────
-          # Import AFTER os.makedirs so the ai/ folder exists
-          # Then patch OUTPUT_FILE to use absolute path
-          import ai.dataset_generator as dg
-          dg.OUTPUT_FILE = os.path.abspath("ai/synthetic_drivers.csv")
-
-          print("Generating synthetic dataset...")
-          dg.generate_dataset()
-
-          synthetic_df = pd.read_csv("ai/synthetic_drivers.csv")
-          print(f"✅ Synthetic data generated: {len(synthetic_df)} records.")
-
-          # ── Step 3: Combine real + synthetic ─────────────────────
           if real_df is not None and len(real_df) > 0:
               combined_df = pd.concat([real_df, synthetic_df], ignore_index=True)
               combined_df = combined_df.sample(frac=1, random_state=42).reset_index(drop=True)
-              combined_df.to_csv("ai/synthetic_drivers.csv", index=False)
-              print(f"✅ Combined dataset saved: {len(combined_df)} total records")
-              print(f"   ├── Real data:      {len(real_df)} records")
-              print(f"   └── Synthetic data: {len(synthetic_df)} records")
+              combined_df.to_csv(SYNTHETIC_PATH, index=False)
+              print(f"✅ Combined: {len(combined_df)} total records")
+              print(f"   ├── Real:      {len(real_df)}")
+              print(f"   └── Synthetic: {len(synthetic_df)}")
           else:
-              print(f"✅ Using synthetic data only: {len(synthetic_df)} records.")
+              print("✅ Using synthetic data only.")
           EOF
 
       - name: Train model
