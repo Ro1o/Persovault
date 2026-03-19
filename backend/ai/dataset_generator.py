@@ -10,7 +10,10 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import SUSPENSION_THRESHOLD
 
 TOTAL_DRIVERS = 15000
-OUTPUT_FILE = "ai/synthetic_drivers.csv"
+
+# Always resolve OUTPUT_FILE relative to this file's location
+# so it works regardless of where Python is called from
+OUTPUT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "synthetic_drivers.csv")
 
 
 # -----------------------------
@@ -71,17 +74,14 @@ def simulate_six_months(cluster_name, current_points):
 
     for month in range(6):
 
-        # Escalation effect for ESCALATING cluster
         if cluster_name == "ESCALATING":
             monthly_prob += 0.02
 
-        # Behavioural noise
         noise = random.uniform(-0.05, 0.05)
         effective_prob = max(0, min(1, monthly_prob + noise))
 
         if random.random() < effective_prob:
 
-            # Random severe spike event
             if random.random() < 0.03:
                 severity_choice = "severe"
             else:
@@ -106,7 +106,6 @@ def simulate_six_months(cluster_name, current_points):
         else:
             days_since_last_offence += 30
 
-            # Behavioural recovery
             if days_since_last_offence > 120:
                 avg_days_between_offences += random.randint(2, 5)
 
@@ -164,14 +163,11 @@ def generate_dataset():
 
             trend_encoded = encode_trend(current_points, projected_points)
 
-            # Label based on suspension threshold
             label = 1 if projected_points >= SUSPENSION_THRESHOLD else 0
 
-            # Label noise (2% misclassification)
             if random.random() < 0.02:
                 label = 1 - label
 
-            # Observation noise
             observed_offences = minor + moderate + severe + random.choice([-1, 0, 0, 1])
             observed_offences = max(0, observed_offences)
 
@@ -192,7 +188,7 @@ def generate_dataset():
 
             rows.append(row)
 
-    # Write CSV
+    # Write CSV to same directory as this file
     with open(OUTPUT_FILE, mode="w", newline="") as file:
         writer = csv.writer(file)
         writer.writerow([
