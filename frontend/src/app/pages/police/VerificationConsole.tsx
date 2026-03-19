@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 
 import { BrowserQRCodeReader } from "@zxing/browser";
+import API_BASE_URL from "../../../config/api";
 
 type VerificationStatus = "idle" | "valid" | "tampered";
 
@@ -29,7 +30,7 @@ export function VerificationConsole() {
 
     try {
 
-      const response = await fetch("http://localhost:8000/verify-passport", {
+      const response = await fetch(`${API_BASE_URL}/verify-passport`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

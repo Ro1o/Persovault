@@ -1,5 +1,6 @@
 import sqlite3
 import json
+import bcrypt
 
 DB_NAME = "passport_db.sqlite"
 
@@ -47,13 +48,32 @@ def init_db():
             suspension_proximity        REAL,
             stability_index             REAL,
             trend_encoded               INTEGER,
-            label                       INTEGER,   -- 1 = at risk of suspension, 0 = safe
+            label                       INTEGER,
             recorded_at                 TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
     conn.commit()
     conn.close()
+
+
+# ---------------------------
+# PASSWORD HASHING
+# ---------------------------
+
+def hash_password(plain_password: str) -> str:
+    """Hash a plain text password using bcrypt."""
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(plain_password.encode("utf-8"), salt)
+    return hashed.decode("utf-8")
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify a plain text password against a bcrypt hash."""
+    return bcrypt.checkpw(
+        plain_password.encode("utf-8"),
+        hashed_password.encode("utf-8")
+    )
 
 
 # ---------------------------
@@ -65,12 +85,15 @@ def create_user(user: dict):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
 
+    # Hash password before storing
+    hashed_pw = hash_password(user["password"])
+
     cursor.execute("""
         INSERT INTO users (username, password, role, full_name, phone, address)
         VALUES (?, ?, ?, ?, ?, ?)
     """, (
         user["username"],
-        user["password"],
+        hashed_pw,          # Store hashed, never plain text
         user["role"],
         user.get("full_name"),
         user.get("phone"),
@@ -99,7 +122,7 @@ def get_user(username: str):
 
     return {
         "username": row[0],
-        "password": row[1],
+        "password": row[1],  # This is now a bcrypt hash
         "role": row[2]
     }
 
@@ -143,10 +166,6 @@ def get_passports_by_driver(driver_id: str):
 # ---------------------------
 
 def save_driver_behaviour(driver_id: str, features: dict, label: int):
-    """
-    Call this whenever a driver logs in or their data is updated,
-    so the AI retraining always has fresh real data to learn from.
-    """
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -188,10 +207,6 @@ def save_driver_behaviour(driver_id: str, features: dict, label: int):
 
 
 def get_all_driver_behaviour():
-    """
-    Returns all recorded driver behaviour rows.
-    Used by the weekly retraining workflow.
-    """
 
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()

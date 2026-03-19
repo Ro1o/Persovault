@@ -1,5 +1,8 @@
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import FastAPI, Query, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+import json as json_lib
+import io
 
 from models.driver import Driver
 
@@ -22,7 +25,7 @@ from services.analytics_engine import (
 )
 
 # Database
-from database import init_db, create_user, get_user, save_driver_behaviour
+from database import init_db, create_user, get_user, save_driver_behaviour, verify_password
 
 
 app = FastAPI()
@@ -68,7 +71,7 @@ def login(user: dict):
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    if db_user["password"] != user["password"]:
+    if not verify_password(user["password"], db_user["password"]):
         raise HTTPException(status_code=401, detail="Invalid password")
 
     if db_user["role"] != user["role"]:
@@ -97,18 +100,74 @@ def validate(
 
 
 # ============================================================
+# QR CODE GENERATION
+# ============================================================
+
+@app.post("/generate-qr")
+def generate_qr(
+    driver: Driver,
+    verification_mode: str = Query("ONLINE", enum=["ONLINE", "OFFLINE"])
+):
+    """
+    Generates a passport and returns it as a QR code image.
+    This ensures the JSON is never modified by copy-paste.
+    """
+    import qrcode
+
+    # Generate passport
+    passport = generate_passport(driver, verification_mode)
+
+    # Serialize to JSON string — exact same string that will be verified
+    passport_json = json_lib.dumps(passport, separators=(',', ':'))
+
+    # Generate QR code
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(passport_json)
+    qr.make(fit=True)
+
+    img = qr.make_image(fill_color="black", back_color="white")
+
+    # Return as PNG image
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+
+    return StreamingResponse(buf, media_type="image/png")
+
+
+# ============================================================
 # PASSPORT VERIFICATION
 # ============================================================
 
 @app.post("/verify-passport")
-def verify(passport: dict):
+async def verify(request: Request):
 
-    is_valid = verify_passport(passport)
+    try:
+        raw_body = await request.body()
+        raw_str = raw_body.decode("utf-8").strip()
 
-    if is_valid:
-        return {"verification_result": "VALID"}
-    else:
-        return {"verification_result": "TAMPERED"}
+        # Parse JSON — handle double-encoded strings
+        try:
+            passport = json_lib.loads(raw_str)
+            if isinstance(passport, str):
+                passport = json_lib.loads(passport)
+        except Exception:
+            return {"verification_result": "TAMPERED", "reason": "Invalid JSON"}
+
+        is_valid, reason = verify_passport(passport)
+
+        if is_valid:
+            return {"verification_result": "VALID", "reason": reason}
+        else:
+            return {"verification_result": "TAMPERED", "reason": reason}
+
+    except Exception as e:
+        return {"verification_result": "TAMPERED", "reason": str(e)}
 
 
 # ============================================================
@@ -118,25 +177,17 @@ def verify(passport: dict):
 @app.post("/predict-risk")
 def predict_risk(driver: Driver):
 
-    # Behaviour stability
     stability = compute_stability(driver)
-
-    # Behaviour trend
     trend = calculate_trend(driver)
-
-    # Suspension proximity
     proximity = compute_proximity(driver)
 
-    # Risk classification
     risk_result = classify_risk(stability, proximity, trend)
 
     risk_score = risk_result["risk_score"]
     risk_level = risk_result["risk_level"]
 
-    # Behaviour score (0–100)
     behaviour_score = round(100 - (risk_score * 100))
 
-    # ── Save real driver behaviour for AI retraining ──────────────
     try:
         features = {
             "current_points":            driver.current_points,
@@ -152,13 +203,11 @@ def predict_risk(driver: Driver):
             "trend_encoded":             1 if trend == "WORSENING" else (-1 if trend == "IMPROVING" else 0),
         }
 
-        # Label: 1 = HIGH risk (at risk of suspension), 0 = LOW/MEDIUM
         label = 1 if risk_level == "HIGH" else 0
 
         save_driver_behaviour(driver.driver_id, features, label)
 
     except Exception as e:
-        # Never let data saving break the main prediction response
         print(f"⚠️  Could not save driver behaviour: {e}")
 
     return {
@@ -176,7 +225,6 @@ def predict_risk(driver: Driver):
 @app.get("/analytics")
 def analytics():
 
-    # Example drivers (simulated database)
     drivers = [
 
         Driver(

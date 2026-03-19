@@ -1,27 +1,21 @@
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet, useNavigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "../contexts/AuthContext";
 import { Navbar } from "./Navbar";
 import { Sidebar } from "./Sidebar";
 import { useEffect } from "react";
 
 function LayoutContent() {
-  const { user, login } = useAuth();
-  const location = useLocation();
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
+    // If no user in context or storage → redirect to login
     if (!user) {
-      const path = location.pathname;
-
-      if (path.includes("/driver")) {
-        login("demo-driver", "password", "driver");
-      } else if (path.includes("/police")) {
-        login("demo-officer", "password", "police");
-      } else if (path.includes("/admin")) {
-        login("demo-admin", "password", "admin");
-      }
+      navigate("/login", { replace: true });
     }
-  }, [user, login, location.pathname]);
+  }, [user, navigate]);
 
+  // Don't render anything while redirecting
   if (!user) {
     return null;
   }

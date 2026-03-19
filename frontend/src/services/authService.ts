@@ -1,9 +1,9 @@
+import API_BASE_URL from "../config/api";
+
 export interface User {
   username: string;
   role: "admin" | "driver" | "police";
 }
-
-const API_URL = "http://localhost:8000";
 
 /* LOGIN */
 
@@ -15,7 +15,7 @@ export async function login(
 
   try {
 
-    const response = await fetch(`${API_URL}/login`, {
+    const response = await fetch(`${API_BASE_URL}/login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -54,7 +54,7 @@ export async function login(
 
 export async function signup(userData: any) {
 
-  const response = await fetch(`${API_URL}/signup`, {
+  const response = await fetch(`${API_BASE_URL}/signup`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -69,15 +69,17 @@ export async function signup(userData: any) {
 
 export function getCurrentUser(): User | null {
 
-  const user = localStorage.getItem("user");
+  const stored =
+    localStorage.getItem("user") || sessionStorage.getItem("user");
 
-  if (!user) return null;
+  if (!stored) return null;
 
-  return JSON.parse(user);
+  return JSON.parse(stored);
 }
 
 /* LOGOUT */
 
 export function logout() {
   localStorage.removeItem("user");
+  sessionStorage.removeItem("user");
 }

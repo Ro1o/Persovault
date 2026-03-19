@@ -6,8 +6,20 @@ def compute_trust(driver, verification_mode: str):
     """
 
     now = datetime.now(timezone.utc)
-    delta = now - driver.last_sync
 
+    # Make last_sync timezone-aware if it isn't already
+    last_sync = driver.last_sync
+    if isinstance(last_sync, datetime):
+        if last_sync.tzinfo is None:
+            last_sync = last_sync.replace(tzinfo=timezone.utc)
+    else:
+        # If it's a string, parse it
+        try:
+            last_sync = datetime.fromisoformat(str(last_sync)).replace(tzinfo=timezone.utc)
+        except Exception:
+            last_sync = now  # fallback to now if parsing fails
+
+    delta = now - last_sync
     hours_since_sync = delta.total_seconds() / 3600
 
     # If online, always high trust

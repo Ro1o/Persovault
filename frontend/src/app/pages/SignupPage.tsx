@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Shield, User, Lock, Phone, MapPin, ArrowLeft, Car, Badge as BadgeIcon } from "lucide-react";
+import API_BASE_URL from "../../config/api";
 
 function SignupForm() {
   const [role, setRole] = useState<"driver" | "police" | "admin">("driver");
@@ -40,7 +41,7 @@ function SignupForm() {
     }
 
     try {
-      const response = await fetch("http://localhost:8000/signup", {
+      const response = await fetch(`${API_BASE_URL}/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

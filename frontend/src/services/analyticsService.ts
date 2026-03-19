@@ -1,7 +1,6 @@
+import API_BASE_URL from "../config/api";
+
 export async function getAnalytics() {
-
-const response = await fetch("http://localhost:8000/analytics");
-
-return response.json();
-
+  const response = await fetch(`${API_BASE_URL}/analytics`);
+  return response.json();
 }

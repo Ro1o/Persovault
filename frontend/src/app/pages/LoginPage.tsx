@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { AuthProvider } from "../contexts/AuthContext";
 import { Shield, User, Lock, Eye, EyeOff, Car, Badge as BadgeIcon, ShieldCheck } from "lucide-react";
+import API_BASE_URL from "../../config/api";
 
 function LoginForm() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<"driver" | "police" | "admin">("driver");
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
 
   const navigate = useNavigate();
@@ -36,9 +37,10 @@ function LoginForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-
+  alert(`Connecting to: ${API_BASE_URL}`); // ← add this temporarily
+  
     try {
-      const response = await fetch("http://localhost:8000/login", {
+      const response = await fetch(`${API_BASE_URL}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password, role }),
@@ -51,7 +53,14 @@ function LoginForm() {
       }
 
       const user = await response.json();
-      localStorage.setItem("user", JSON.stringify(user));
+
+      // Remember me: localStorage persists, sessionStorage clears on browser close
+      if (rememberMe) {
+        localStorage.setItem("user", JSON.stringify(user));
+      } else {
+        sessionStorage.setItem("user", JSON.stringify(user));
+        localStorage.removeItem("user");
+      }
 
       const routes = {
         driver: "/app/driver/dashboard",
@@ -149,7 +158,12 @@ function LoginForm() {
             {/* Remember me + Forgot password */}
             <div className="flex items-center justify-between text-sm">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" className="rounded" />
+                <input
+                  type="checkbox"
+                  className="rounded"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                />
                 <span className="text-muted-foreground">Remember me</span>
               </label>
               <a href="#" className="text-primary hover:underline font-medium">
@@ -157,10 +171,7 @@ function LoginForm() {
               </a>
             </div>
 
-            {/* Error message */}
-            {error && (
-              <p className="text-red-500 text-sm">{error}</p>
-            )}
+            {error && <p className="text-red-500 text-sm">{error}</p>}
 
             <button
               type="submit"
@@ -194,9 +205,5 @@ function LoginForm() {
 }
 
 export function LoginPage() {
-  return (
-    <AuthProvider>
-      <LoginForm />
-    </AuthProvider>
-  );
+  return <LoginForm />;
 }
