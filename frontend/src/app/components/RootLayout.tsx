@@ -1,5 +1,6 @@
 import { Outlet, useNavigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "../contexts/AuthContext";
+import { NotificationProvider } from "../contexts/NotificationContext";
 import { Navbar } from "./Navbar";
 import { Sidebar } from "./Sidebar";
 import { useEffect } from "react";
@@ -42,7 +43,9 @@ function LayoutContent() {
 export function RootLayout() {
   return (
     <AuthProvider>
-      <LayoutContent />
+      <NotificationProvider>
+        <LayoutContent />
+      </NotificationProvider>
     </AuthProvider>
   );
 }
