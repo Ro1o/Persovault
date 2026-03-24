@@ -1,0 +1,2 @@
+model_type,accuracy,precision,recall,f1,roc_auc,tn,fp,fn,tp,test_samples
+Logistic Regression,0.9627,0.9601,0.9162,0.9376,0.9687,2046,35,77,842,3000

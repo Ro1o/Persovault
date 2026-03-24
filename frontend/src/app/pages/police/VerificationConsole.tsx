@@ -4,13 +4,33 @@ import {
   Keyboard,
   CheckCircle2,
   XCircle,
-  X
+  X,
+  Shield,
+  User,
+  AlertTriangle,
+  Clock,
+  Activity,
+  TrendingUp,
+  TrendingDown,
+  Minus
 } from "lucide-react";
 
 import { BrowserQRCodeReader } from "@zxing/browser";
 import API_BASE_URL from "../../../config/api";
 
 type VerificationStatus = "idle" | "valid" | "tampered";
+
+// ── NEW: passport data interface for card display ─────────────
+interface PassportData {
+  driver_id: string;
+  compliance:     { status: string; suspension_proximity: number };
+  behaviour:      { stability_index: number; trend: string };
+  risk:           { classification: { risk_score: number; risk_level: string } };
+  trust:          { trust_level: string; verification_mode: string };
+  ai_prediction:  { suspension_probability_6m: number; risk_level: string };
+  metadata:       { issued_at: string; expires_at: string };
+  signature:      string;
+}
 
 export function VerificationConsole() {
 
@@ -19,6 +39,10 @@ export function VerificationConsole() {
   const [verificationStatus, setVerificationStatus] = useState<VerificationStatus>("idle");
   const [isScanning, setIsScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+
+  // ── NEW: state for passport card display ─────────────────────
+  const [passportData, setPassportData] = useState<PassportData | null>(null);
+  const [verificationReason, setVerificationReason] = useState<string>("");
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const codeReaderRef = useRef<BrowserQRCodeReader | null>(null);
@@ -30,15 +54,29 @@ export function VerificationConsole() {
 
     try {
 
+      // ── CHANGE: parse JSON properly + store passport data ────
+      const raw = token ? token : passportToken;
+      let body: string;
+      try {
+        const parsed = JSON.parse(raw);
+        body = JSON.stringify(parsed);
+      } catch {
+        body = raw;
+      }
+
       const response = await fetch(`${API_BASE_URL}/verify-passport`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
-        body: token ? token : passportToken
+        body: body
       });
 
       const data = await response.json();
+
+      // Store passport data and reason for card display
+      setVerificationReason(data.reason || "");
+      setPassportData(data.passport || null);
 
       if (data.verification_result === "VALID") {
         setVerificationStatus("valid");
@@ -59,6 +97,7 @@ export function VerificationConsole() {
 
   const handleScan = () => {
     setVerificationStatus("idle");
+    setPassportData(null);  // ── NEW: reset passport data on new scan
     setScanError(null);
     setIsScanning(true);
   };
@@ -160,6 +199,28 @@ export function VerificationConsole() {
 
   }, [isScanning]);
 
+  // ── NEW: helper functions for card display ────────────────────
+  const getRiskColor = (level: string) => {
+    switch (level?.toUpperCase()) {
+      case "LOW":    return "text-green-600 dark:text-green-400";
+      case "MEDIUM": return "text-orange-600 dark:text-orange-400";
+      case "HIGH":   return "text-red-600 dark:text-red-400";
+      default:       return "text-gray-600";
+    }
+  };
+
+  const getTrendIcon = (trend: string) => {
+    switch (trend?.toUpperCase()) {
+      case "WORSENING": return <TrendingDown className="w-4 h-4 text-red-500" />;
+      case "IMPROVING": return <TrendingUp className="w-4 h-4 text-green-500" />;
+      default:          return <Minus className="w-4 h-4 text-gray-500" />;
+    }
+  };
+
+  const formatDate = (iso: string) => {
+    try { return new Date(iso).toLocaleString(); } catch { return iso; }
+  };
+
   return (
 
     <div className="space-y-6">
@@ -193,6 +254,7 @@ export function VerificationConsole() {
               setVerificationMethod("qr");
               setVerificationStatus("idle");
               setPassportToken("");
+              setPassportData(null);
             }}
             className={`p-6 rounded-lg border-2 transition-colors ${
               verificationMethod === "qr"
@@ -214,6 +276,7 @@ export function VerificationConsole() {
               setVerificationMethod("manual");
               setVerificationStatus("idle");
               setPassportToken("");
+              setPassportData(null);
             }}
             className={`p-6 rounded-lg border-2 transition-colors ${
               verificationMethod === "manual"
@@ -314,54 +377,160 @@ export function VerificationConsole() {
 
       )}
 
-      {/* Verification Result */}
+      {/* ── CHANGED: Verification Result — now shows full passport card ── */}
 
-      {verificationStatus === "valid" && (
+      {verificationStatus !== "idle" && (
 
-        <div className="flex justify-center">
+        <div className={`rounded-2xl overflow-hidden shadow-2xl border-2 ${
+          verificationStatus === "valid" ? "border-green-500" : "border-red-500"
+        }`}>
 
-          <div className="flex items-center gap-3 px-8 py-4 rounded-2xl bg-green-100">
-
-            <CheckCircle2 className="w-12 h-12 text-green-600"/>
-
-            <div>
-
-              <p className="text-2xl font-bold text-green-800">
-                VALID
-              </p>
-
-              <p className="text-sm text-green-700">
-                Passport verified successfully
-              </p>
-
+          {/* Card Header */}
+          <div className={`px-6 py-4 flex items-center justify-between ${
+            verificationStatus === "valid" ? "bg-green-500" : "bg-red-500"
+          }`}>
+            <div className="flex items-center gap-3">
+              <Shield className="w-6 h-6 text-white" />
+              <span className="text-white font-bold text-lg">
+                PersoVault — Behaviour Passport
+              </span>
             </div>
+            <div className="flex items-center gap-2 bg-white/20 px-3 py-1 rounded-full">
+              {verificationStatus === "valid"
+                ? <CheckCircle2 className="w-5 h-5 text-white" />
+                : <XCircle className="w-5 h-5 text-white" />
+              }
+              <span className="text-white font-bold">
+                {verificationStatus === "valid" ? "VERIFIED" : "INVALID"}
+              </span>
+            </div>
+          </div>
+
+          {/* Card Body */}
+          <div className="bg-white dark:bg-gray-800 p-6">
+
+            {verificationStatus === "valid" && passportData ? (
+
+              <div className="space-y-6">
+
+                {/* Driver Info */}
+                <div className="flex items-center gap-4 pb-4 border-b border-gray-200 dark:border-gray-700">
+                  <div className="w-14 h-14 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                    <User className="w-7 h-7 text-gray-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Driver ID</p>
+                    <p className="text-xl font-bold text-gray-900 dark:text-white font-mono">
+                      {passportData.driver_id}
+                    </p>
+                  </div>
+                  <div className="ml-auto text-right">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Compliance</p>
+                    <p className={`text-lg font-bold ${
+                      passportData.compliance.status === "VALID" ? "text-green-600" : "text-red-600"
+                    }`}>
+                      {passportData.compliance.status}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Key Metrics */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 text-center">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Risk Level</p>
+                    <p className={`text-lg font-bold ${getRiskColor(passportData.risk.classification.risk_level)}`}>
+                      {passportData.risk.classification.risk_level}
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 text-center">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Trust Level</p>
+                    <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                      {passportData.trust.trust_level}
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 text-center">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Stability</p>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white">
+                      {passportData.behaviour.stability_index}%
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 text-center">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Susp. Risk</p>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white">
+                      {Math.round(passportData.compliance.suspension_proximity * 100)}%
+                    </p>
+                  </div>
+                </div>
+
+                {/* AI Prediction */}
+                <div className="flex items-center gap-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                  <Activity className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      AI Suspension Probability (6 months)
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Based on machine learning analysis
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {getTrendIcon(passportData.behaviour.trend)}
+                    <span className={`text-lg font-bold ${
+                      passportData.ai_prediction.suspension_probability_6m > 0.5
+                        ? "text-red-600" : "text-green-600"
+                    }`}>
+                      {Math.round(passportData.ai_prediction.suspension_probability_6m * 100)}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* Timestamps */}
+                <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-200 dark:border-gray-700">
+                  <Clock className="w-4 h-4 flex-shrink-0" />
+                  <span>Issued: {formatDate(passportData.metadata.issued_at)}</span>
+                  <span className="mx-2">•</span>
+                  <span>Expires: {formatDate(passportData.metadata.expires_at)}</span>
+                </div>
+
+                {/* Signature */}
+                <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 flex items-center gap-1">
+                    <Shield className="w-3 h-3" />
+                    HMAC-SHA256 Cryptographic Signature
+                  </p>
+                  <p className="text-xs font-mono text-gray-700 dark:text-gray-300 break-all">
+                    {passportData.signature}
+                  </p>
+                </div>
+
+              </div>
+
+            ) : verificationStatus === "tampered" ? (
+
+              <div className="flex flex-col items-center py-8 gap-4">
+                <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
+                  <AlertTriangle className="w-8 h-8 text-red-600" />
+                </div>
+                <div className="text-center">
+                  <p className="text-xl font-bold text-red-800 dark:text-red-400 mb-2">
+                    Passport Invalid
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {verificationReason || "Cryptographic signature mismatch — this passport has been tampered with or has expired."}
+                  </p>
+                </div>
+              </div>
+
+            ) : null}
 
           </div>
 
-        </div>
-
-      )}
-
-      {verificationStatus === "tampered" && (
-
-        <div className="flex justify-center">
-
-          <div className="flex items-center gap-3 px-8 py-4 rounded-2xl bg-red-100">
-
-            <XCircle className="w-12 h-12 text-red-600"/>
-
-            <div>
-
-              <p className="text-2xl font-bold text-red-800">
-                INVALID
-              </p>
-
-              <p className="text-sm text-red-700">
-                Passport signature mismatch
-              </p>
-
-            </div>
-
+          {/* Card Footer */}
+          <div className={`px-6 py-3 text-xs text-white flex items-center justify-between ${
+            verificationStatus === "valid" ? "bg-green-600" : "bg-red-600"
+          }`}>
+            <span>PersoVault Digital Identity System • Republic of Mauritius</span>
+            <span>{new Date().toLocaleString()}</span>
           </div>
 
         </div>
