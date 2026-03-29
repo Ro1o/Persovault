@@ -3,7 +3,7 @@ import { RiskGauge } from "../../components/RiskGauge";
 import { Shield, TrendingUp, TrendingDown, Minus, Calendar, RefreshCw } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useState, useEffect } from "react";
-import API_BASE_URL from "../../../config/api";
+import API_BASE_URL, { apiFetch } from "../../../config/api";
 
 interface Profile {
   full_name: string;
@@ -64,7 +64,7 @@ export function DriverDashboard() {
     setLoading(true);
     try {
       // Step 1 — Get profile
-      const profileRes = await fetch(`${API_BASE_URL}/profile/${user.username}`);
+      const profileRes = await apiFetch(`${API_BASE_URL}/profile/${user.username}`);
       const profileData: Profile = profileRes.ok ? await profileRes.json() : {
         full_name: user.full_name || "—",
         driver_id: user.driver_id || "—",
@@ -78,9 +78,9 @@ export function DriverDashboard() {
 
       // Step 2 — Get stats + offences in parallel
       const [statsRes, offencesRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/driver-stats/${driverId}`),
-        fetch(`${API_BASE_URL}/offences/${driverId}`),
-      ]);
+  apiFetch(`${API_BASE_URL}/driver-stats/${driverId}`),
+  apiFetch(`${API_BASE_URL}/offences/${driverId}`),
+]);
 
       if (statsRes.ok) {
         setStats(await statsRes.json());

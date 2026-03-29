@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Shield } from "lucide-react";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import API_BASE_URL from "../../../config/api";
+import API_BASE_URL, { apiFetch } from "../../../config/api";
 
 const coatOfArms = "/coat-of-arms.png";
 
@@ -104,7 +104,7 @@ export function DigitalTravelPassport() {
       setLoading(true);
       try {
         // Try NIC record first (has date_of_birth)
-        const nicRes = await fetch(`${API_BASE_URL}/verify-nic/${user.username}`);
+        const nicRes = await apiFetch(`${API_BASE_URL}/verify-nic/${user.username}`);
         if (nicRes.ok) {
           const nicData = await nicRes.json();
           setProfile({
@@ -118,7 +118,7 @@ export function DigitalTravelPassport() {
         }
 
         // Fallback to profile endpoint
-        const profileRes = await fetch(`${API_BASE_URL}/profile/${user.username}`);
+        const profileRes = await apiFetch(`${API_BASE_URL}/profile/${user.username}`);
         if (profileRes.ok) {
           const profileData = await profileRes.json();
           setProfile({

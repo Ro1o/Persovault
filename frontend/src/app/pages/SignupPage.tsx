@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Shield, User, Lock, Phone, MapPin, ArrowLeft, Car, Badge as BadgeIcon, CreditCard, Calendar, CheckCircle, XCircle, AlertCircle } from "lucide-react";
-import API_BASE_URL from "../../config/api";
+import API_BASE_URL, { apiFetch } from "../../config/api";
 
 // ─────────────────────────────────────────────────────────────
 // CLIENT-SIDE NIC VALIDATION
@@ -158,7 +158,7 @@ function SignupForm() {
 
     try {
       // Step 1 — Create account
-      const response = await fetch(`${API_BASE_URL}/signup`, {
+      const response = await apiFetch(`${API_BASE_URL}/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -185,7 +185,7 @@ function SignupForm() {
 
       // Step 2 — Register NIC with 7-layer security (drivers only)
       if (role === "driver" && nicNumber) {
-        const nicResponse = await fetch(`${API_BASE_URL}/register-nic`, {
+        const nicResponse = await apiFetch(`${API_BASE_URL}/register-nic`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

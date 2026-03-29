@@ -1,7 +1,7 @@
 import { AlertTriangle, Calendar, MapPin, FileText, Clock, CheckCircle, ArrowLeft, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import API_BASE_URL from "../../../config/api";
+import API_BASE_URL, { apiFetch } from "../../../config/api";
 
 interface Offence {
   id:           number;
@@ -62,7 +62,7 @@ export function PenaltyPoints() {
       const driverId = user.driver_id;
       if (!driverId) return;
 
-      const res = await fetch(`${API_BASE_URL}/offences/${driverId}`);
+      const res = await apiFetch(`${API_BASE_URL}/offences/${driverId}`);
       if (res.ok) {
         const data = await res.json();
         setOffences(data.offences || []);

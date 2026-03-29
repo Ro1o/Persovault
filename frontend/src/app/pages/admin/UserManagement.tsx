@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Users, Plus, Shield, RefreshCw, Search } from "lucide-react";
-import API_BASE_URL from "../../../config/api";
+import API_BASE_URL, { apiFetch } from "../../../config/api";
 
 interface User {
   username:        string;
@@ -30,8 +30,8 @@ export function UserManagement() {
     setLoading(true);
     try {
       const [usersRes, statsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/admin/users`),
-        fetch(`${API_BASE_URL}/admin/stats`),
+        apiFetch(`${API_BASE_URL}/admin/users`),
+        apiFetch(`${API_BASE_URL}/admin/stats`),
       ]);
 
       if (usersRes.ok) {

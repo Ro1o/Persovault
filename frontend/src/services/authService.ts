@@ -15,7 +15,7 @@ export async function login(
 
   try {
 
-    const response = await fetch(`${API_BASE_URL}/login`, {
+    const response = await apiFetch(`${API_BASE_URL}/login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -54,7 +54,7 @@ export async function login(
 
 export async function signup(userData: any) {
 
-  const response = await fetch(`${API_BASE_URL}/signup`, {
+  const response = await apiFetch(`${API_BASE_URL}/signup`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"

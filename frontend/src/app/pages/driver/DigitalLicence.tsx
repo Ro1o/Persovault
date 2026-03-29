@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, CheckCircle, Shield, Calendar, User, CreditCard, RefreshCw } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useState, useEffect } from "react";
-import API_BASE_URL from "../../../config/api";
+import API_BASE_URL, { apiFetch } from "../../../config/api";
 
 interface LicenceData {
   full_name:     string;
@@ -62,8 +62,8 @@ export function DigitalLicence() {
     try {
       // Fetch profile + NIC in parallel
       const [profileRes, nicRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/profile/${user.username}`),
-        fetch(`${API_BASE_URL}/verify-nic/${user.username}`),
+        apiFetch(`${API_BASE_URL}/profile/${user.username}`),
+        apiFetch(`${API_BASE_URL}/verify-nic/${user.username}`),
       ]);
 
       const profileData = profileRes.ok ? await profileRes.json() : {};
@@ -81,7 +81,7 @@ export function DigitalLicence() {
 
       // Fetch driver stats for penalty points
       if (profileData.driver_id) {
-        const statsRes = await fetch(`${API_BASE_URL}/driver-stats/${profileData.driver_id}`);
+        const statsRes = await apiFetch(`${API_BASE_URL}/driver-stats/${profileData.driver_id}`);
         if (statsRes.ok) {
           const statsData = await statsRes.json();
           setStats(statsData);

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Filter, CheckCircle2, XCircle, Shield, RefreshCw } from "lucide-react";
-import API_BASE_URL from "../../../config/api";
+import API_BASE_URL, { apiFetch } from "../../../config/api";
 
 interface AuditLog {
   action:     string;
@@ -22,7 +22,7 @@ export function SystemLogs() {
   const fetchLogs = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/audit-log?limit=100`);
+      const res = await apiFetch(`${API_BASE_URL}/admin/audit-log?limit=100`);
       if (res.ok) {
         const data = await res.json();
         setLogs(data.audit_log || []);

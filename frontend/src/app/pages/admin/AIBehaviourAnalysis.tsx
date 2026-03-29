@@ -7,8 +7,7 @@ import {
 } from "recharts";
 import { useEffect, useState } from "react";
 import { getFeatureImportance } from "../../../services/aiService";
-import API_BASE_URL from "../../../config/api";
-
+import API_BASE_URL, { apiFetch } from "../../../config/api";
 // ── Explanation Generator ─────────────────────────────────────────────────────
 function generateExplanation(
   riskScore: number,
@@ -84,7 +83,7 @@ export function AIBehaviourAnalysis() {
     setLoading(true);
     try {
       // Step 1 — get real system stats
-      const statsRes = await fetch(`${API_BASE_URL}/admin/stats`);
+      const statsRes = await apiFetch(`${API_BASE_URL}/admin/stats`);
       const stats = statsRes.ok ? await statsRes.json() : null;
 
       if (stats) {
@@ -99,8 +98,7 @@ export function AIBehaviourAnalysis() {
         // Offence trend from real monthly data
         setOffenceTrend(stats.offence_trend || []);
 
-        // Offence category distribution — derive from real offences
-        const offencesRes = await fetch(`${API_BASE_URL}/admin/stats`);
+     
         // Use total_active_offences to estimate distribution
         const total = stats.total_active_offences || 0;
         setOffenceDistribution([
@@ -121,7 +119,7 @@ export function AIBehaviourAnalysis() {
         const suspendedRatio = stats.suspended_drivers / totalDrivers;
 
         // Step 3 — call /predict-risk with real system-average driver
-        const predictRes = await fetch(`${API_BASE_URL}/predict-risk`, {
+        const predictRes = await apiFetch(`${API_BASE_URL}/predict-risk`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

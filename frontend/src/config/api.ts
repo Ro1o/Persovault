@@ -1,7 +1,13 @@
-// src/config/api.ts
-// Change IP to your computer's local WiFi IP when testing on a physical device
-// Change back to "http://localhost:8000" for browser testing
-
-const API_BASE_URL = "http://192.168.100.21:8000";
-
+const API_BASE_URL = "https://unavid-roentgenological-rikki.ngrok-free.dev";
 export default API_BASE_URL;
+
+export const apiFetch = (url: string, options: RequestInit = {}) => {
+  return fetch(url, {
+    ...options,
+    headers: {
+      "ngrok-skip-browser-warning": "true",
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
+  });
+};

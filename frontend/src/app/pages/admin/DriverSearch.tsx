@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Search, User, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import API_BASE_URL from "../../../config/api";
+import API_BASE_URL, { apiFetch } from "../../../config/api";
 
 interface Driver {
   username:        string;
@@ -25,7 +25,7 @@ export function DriverSearch() {
   const fetchDrivers = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/users`);
+      const res = await apiFetch(`${API_BASE_URL}/admin/users`);
       if (res.ok) {
         const data = await res.json();
         setDrivers(data.drivers || []);

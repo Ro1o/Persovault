@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, CheckCircle, Shield, XCircle, AlertCircle, Lock, RefreshCw } from "lucide-react";
 import { useState, useEffect } from "react";
-import API_BASE_URL from "../../../config/api";
+import API_BASE_URL, { apiFetch } from "../../../config/api";
 
 const coatOfArms = "/coat-of-arms.png";
 
@@ -44,7 +44,7 @@ export function DigitalNIC() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/verify-nic/${user.username}`);
+      const response = await apiFetch(`${API_BASE_URL}/verify-nic/${user.username}`);
       if (response.ok) {
         const data = await response.json();
         setSecurityReport(data);

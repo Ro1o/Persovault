@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Shield, User, Lock, Eye, EyeOff, Car, Badge as BadgeIcon, ShieldCheck } from "lucide-react";
-import API_BASE_URL from "../../config/api";
+import API_BASE_URL, { apiFetch } from "../../config/api";
 
 function LoginForm() {
   const [username, setUsername] = useState("");
@@ -40,7 +40,7 @@ function LoginForm() {
 
   
     try {
-      const response = await fetch(`${API_BASE_URL}/login`, {
+      const response = await apiFetch(`${API_BASE_URL}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password, role }),

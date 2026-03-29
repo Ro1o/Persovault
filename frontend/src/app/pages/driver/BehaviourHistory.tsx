@@ -1,7 +1,7 @@
 import { Shield, TrendingDown, Calendar, AlertTriangle, CheckCircle, XCircle, Navigation, RefreshCw } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useState, useEffect } from "react";
-import API_BASE_URL from "../../../config/api";
+import API_BASE_URL, { apiFetch } from "../../../config/api";
 
 // ── NEW: interfaces ───────────────────────────────────────────
 interface Offence {
@@ -66,8 +66,8 @@ export function BehaviourHistory() {
     setLoading(true);
     try {
       const [offencesRes, statsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/offences/${driverId}`),
-        fetch(`${API_BASE_URL}/driver-stats/${driverId}`),
+        apiFetch(`${API_BASE_URL}/offences/${driverId}`),
+        apiFetch(`${API_BASE_URL}/driver-stats/${driverId}`),
       ]);
 
       if (offencesRes.ok) {

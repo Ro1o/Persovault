@@ -64,7 +64,7 @@ export function VerificationConsole() {
         body = raw;
       }
 
-      const response = await fetch(`${API_BASE_URL}/verify-passport`, {
+      const response = await apiFetch(`${API_BASE_URL}/verify-passport`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

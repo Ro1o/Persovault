@@ -2,7 +2,7 @@ import { AnalyticsCard } from "../../components/AnalyticsCard";
 import { Users, AlertTriangle, CreditCard, ScanLine, RefreshCw, Shield } from "lucide-react";
 import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useState, useEffect } from "react";
-import API_BASE_URL from "../../../config/api";
+import API_BASE_URL, { apiFetch } from "../../../config/api";
 
 interface AdminStats {
   total_drivers:          number;
@@ -33,8 +33,8 @@ export function AdminDashboard() {
     setLoading(true);
     try {
       const [statsRes, featuresRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/admin/stats`),
-        fetch(`${API_BASE_URL}/feature-importance`),
+        apiFetch(`${API_BASE_URL}/admin/stats`),
+        apiFetch(`${API_BASE_URL}/feature-importance`),
       ]);
 
       if (statsRes.ok)    setStats(await statsRes.json());

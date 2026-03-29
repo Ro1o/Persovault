@@ -1,6 +1,5 @@
 import {
   User,
-  Mail,
   Phone,
   MapPin,
   Shield,
@@ -16,7 +15,7 @@ import {
 
 import { useState, useEffect } from "react";
 import { DriverRiskPanel } from "../../components/DriverRiskPanel";
-import API_BASE_URL from "../../../config/api";
+import API_BASE_URL, { apiFetch } from "../../../config/api";
 
 interface Profile {
   username:  string;
@@ -29,50 +28,37 @@ interface Profile {
 
 export function DriverProfile() {
 
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [profile, setProfile]               = useState<Profile | null>(null);
+  const [loading, setLoading]               = useState(true);
+  const [driverStats, setDriverStats]       = useState<any>(null);
+  const [driverOffences, setDriverOffences] = useState<any[]>([]);
 
   // Change password modal state
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [showCurrent, setShowCurrent] = useState(false);
-  const [showNew, setShowNew] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [passwordError, setPasswordError] = useState("");
-  const [passwordSuccess, setPasswordSuccess] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentPassword, setCurrentPassword]     = useState("");
+  const [newPassword, setNewPassword]             = useState("");
+  const [confirmPassword, setConfirmPassword]     = useState("");
+  const [showCurrent, setShowCurrent]             = useState(false);
+  const [showNew, setShowNew]                     = useState(false);
+  const [showConfirm, setShowConfirm]             = useState(false);
+  const [passwordError, setPasswordError]         = useState("");
+  const [passwordSuccess, setPasswordSuccess]     = useState("");
+  const [isSubmitting, setIsSubmitting]           = useState(false);
 
   const user = JSON.parse(
     localStorage.getItem("user") || sessionStorage.getItem("user") || "{}"
   );
 
-  const driver = {
-    driver_id:                 profile?.driver_id || "DRV-2026-DEMO",
-    current_points:            2,
-    previous_points:           1,
-    offences_last_12m:         1,
-    minor_offences:            1,
-    moderate_offences:         0,
-    severe_offences:           0,
-    days_since_last_offence:   145,
-    avg_days_between_offences: 300,
-    years_since_licence_issue: 3,
-    last_sync: new Date().toISOString(),
-  };
-
   // Fetch real profile from backend
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/profile/${user.username}`);
+        const response = await apiFetch(`${API_BASE_URL}/profile/${user.username}`);
         if (response.ok) {
           const data = await response.json();
           setProfile(data);
         }
       } catch {
-        // fallback to localStorage data if server unreachable
         setProfile({
           username:  user.username  || "—",
           role:      user.role      || "driver",
@@ -87,6 +73,51 @@ export function DriverProfile() {
     };
     if (user.username) fetchProfile();
   }, []);
+
+  // Fetch real stats + offences once profile is loaded
+  useEffect(() => {
+    const fetchStats = async () => {
+      const driverId = profile?.driver_id || user.driver_id;
+      if (!driverId) return;
+      try {
+        const [statsRes, offencesRes] = await Promise.all([
+          apiFetch(`${API_BASE_URL}/driver-stats/${driverId}`),
+          apiFetch(`${API_BASE_URL}/offences/${driverId}`),
+        ]);
+        if (statsRes.ok)    setDriverStats(await statsRes.json());
+        if (offencesRes.ok) {
+          const d = await offencesRes.json();
+          setDriverOffences(d.offences || []);
+        }
+      } catch {}
+    };
+    fetchStats();
+  }, [profile]);
+
+  // Build real driver object for AI risk panel
+  const offences        = driverOffences;
+  const minor           = offences.filter((o: any) => o.severity === "minor").length;
+  const moderate        = offences.filter((o: any) => o.severity === "moderate").length;
+  const severe          = offences.filter((o: any) => o.severity === "severe").length;
+  const twelveMonthsAgo = new Date();
+  twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1);
+  const offencesLast12m = offences.filter((o: any) =>
+    new Date(o.offence_date) >= twelveMonthsAgo
+  ).length;
+
+  const driver = {
+    driver_id:                 profile?.driver_id || user.driver_id || "DRV-2026-DEMO",
+    current_points:            driverStats?.total_points ?? 0,
+    previous_points:           Math.max((driverStats?.total_points ?? 0) - 2, 0),
+    offences_last_12m:         offencesLast12m,
+    minor_offences:            minor,
+    moderate_offences:         moderate,
+    severe_offences:           severe,
+    days_since_last_offence:   driverStats?.clean_days ?? 999,
+    avg_days_between_offences: 90,
+    years_since_licence_issue: 3,
+    last_sync: new Date().toISOString(),
+  };
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,7 +135,7 @@ export function DriverProfile() {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/change-password`, {
+      const response = await apiFetch(`${API_BASE_URL}/change-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -138,13 +169,11 @@ export function DriverProfile() {
   return (
     <div className="space-y-6">
 
-      {/* Page Header */}
       <div>
         <h1 className="text-3xl font-bold text-foreground mb-2">Driver Profile</h1>
         <p className="text-muted-foreground">View and manage your personal information</p>
       </div>
 
-      {/* Profile Header Card */}
       <div className="bg-card rounded-lg p-8 border border-border shadow-sm">
         <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
           <div className="w-32 h-32 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800 rounded-full flex items-center justify-center">
@@ -176,14 +205,12 @@ export function DriverProfile() {
         </div>
       </div>
 
-      {/* AI Driver Risk Panel */}
+      {/* AI Driver Risk Panel — now uses real data */}
       <DriverRiskPanel driver={driver} />
 
-      {/* Personal Information */}
       <div className="bg-card rounded-lg p-6 border border-border shadow-sm">
         <h2 className="text-lg font-semibold text-foreground mb-6">Personal Information</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
           <div className="flex items-start gap-3">
             <User className="w-5 h-5 text-gray-900 dark:text-white" />
             <div>
@@ -191,7 +218,6 @@ export function DriverProfile() {
               <p className="font-semibold text-foreground">{profile?.full_name || "—"}</p>
             </div>
           </div>
-
           <div className="flex items-start gap-3">
             <MapPin className="w-5 h-5 text-gray-900 dark:text-white" />
             <div>
@@ -199,7 +225,6 @@ export function DriverProfile() {
               <p className="font-semibold text-foreground">{profile?.address || "—"}</p>
             </div>
           </div>
-
           <div className="flex items-start gap-3">
             <Phone className="w-5 h-5 text-gray-900 dark:text-white" />
             <div>
@@ -207,11 +232,9 @@ export function DriverProfile() {
               <p className="font-semibold text-foreground">{profile?.phone || "—"}</p>
             </div>
           </div>
-
         </div>
       </div>
 
-      {/* Account Security */}
       <div className="bg-card rounded-lg p-6 border border-border shadow-sm">
         <h2 className="text-lg font-semibold text-foreground mb-6">Account Security</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -226,9 +249,7 @@ export function DriverProfile() {
             <Clock className="w-5 h-5 text-gray-900 dark:text-white" />
             <div>
               <p className="text-sm text-muted-foreground">Last Login</p>
-              <p className="font-semibold text-foreground">
-                {new Date().toLocaleString()}
-              </p>
+              <p className="font-semibold text-foreground">{new Date().toLocaleString()}</p>
             </div>
           </div>
         </div>
@@ -247,41 +268,27 @@ export function DriverProfile() {
         </div>
       </div>
 
-      {/* Change Password Modal */}
       {showPasswordModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
           <div className="bg-card rounded-xl shadow-2xl border border-border w-full max-w-md p-6">
-
-            {/* Modal Header */}
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-2">
                 <Lock className="w-5 h-5 text-gray-900 dark:text-white" />
                 <h3 className="text-lg font-semibold text-foreground">Change Password</h3>
               </div>
-              <button
-                onClick={() => setShowPasswordModal(false)}
-                className="text-muted-foreground hover:text-foreground"
-              >
+              <button onClick={() => setShowPasswordModal(false)} className="text-muted-foreground hover:text-foreground">
                 <XCircle className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleChangePassword} className="space-y-4">
-
-              {/* Current Password */}
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Current Password
-                </label>
+                <label className="block text-sm font-medium text-foreground mb-2">Current Password</label>
                 <div className="relative">
-                  <input
-                    type={showCurrent ? "text" : "password"}
-                    value={currentPassword}
+                  <input type={showCurrent ? "text" : "password"} value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
                     className="w-full px-4 py-2 pr-10 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="Enter current password"
-                    required
-                  />
+                    placeholder="Enter current password" required />
                   <button type="button" onClick={() => setShowCurrent(!showCurrent)}
                     className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground">
                     {showCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -289,21 +296,13 @@ export function DriverProfile() {
                 </div>
               </div>
 
-              {/* New Password */}
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  New Password
-                </label>
+                <label className="block text-sm font-medium text-foreground mb-2">New Password</label>
                 <div className="relative">
-                  <input
-                    type={showNew ? "text" : "password"}
-                    value={newPassword}
+                  <input type={showNew ? "text" : "password"} value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     className="w-full px-4 py-2 pr-10 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="Min 8 characters"
-                    required
-                    minLength={8}
-                  />
+                    placeholder="Min 8 characters" required minLength={8} />
                   <button type="button" onClick={() => setShowNew(!showNew)}
                     className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground">
                     {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -311,21 +310,13 @@ export function DriverProfile() {
                 </div>
               </div>
 
-              {/* Confirm New Password */}
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Confirm New Password
-                </label>
+                <label className="block text-sm font-medium text-foreground mb-2">Confirm New Password</label>
                 <div className="relative">
-                  <input
-                    type={showConfirm ? "text" : "password"}
-                    value={confirmPassword}
+                  <input type={showConfirm ? "text" : "password"} value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     className="w-full px-4 py-2 pr-10 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="Repeat new password"
-                    required
-                    minLength={8}
-                  />
+                    placeholder="Repeat new password" required minLength={8} />
                   <button type="button" onClick={() => setShowConfirm(!showConfirm)}
                     className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground">
                     {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -333,7 +324,6 @@ export function DriverProfile() {
                 </div>
               </div>
 
-              {/* Error */}
               {passwordError && (
                 <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
                   <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
@@ -341,7 +331,6 @@ export function DriverProfile() {
                 </div>
               )}
 
-              {/* Success */}
               {passwordSuccess && (
                 <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                   <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
@@ -349,20 +338,13 @@ export function DriverProfile() {
                 </div>
               )}
 
-              {/* Buttons */}
               <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowPasswordModal(false)}
-                  className="flex-1 px-4 py-2 border border-border rounded-lg text-foreground hover:bg-accent transition-colors"
-                >
+                <button type="button" onClick={() => setShowPasswordModal(false)}
+                  className="flex-1 px-4 py-2 border border-border rounded-lg text-foreground hover:bg-accent transition-colors">
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="flex-1 px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-lg font-medium hover:bg-gray-800 transition-colors disabled:opacity-50"
-                >
+                <button type="submit" disabled={isSubmitting}
+                  className="flex-1 px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-lg font-medium hover:bg-gray-800 transition-colors disabled:opacity-50">
                   {isSubmitting ? "Changing..." : "Change Password"}
                 </button>
               </div>
