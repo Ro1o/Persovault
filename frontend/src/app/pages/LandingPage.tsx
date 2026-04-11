@@ -201,7 +201,7 @@ export function LandingPage() {
               <span className="text-xl font-bold text-gray-900 dark:text-white">PersoVault</span>
             </div>
             <p className="text-gray-600 dark:text-gray-400 text-sm">
-              © 2026 PersoVault. Government-Grade Digital Identity System.
+              © 2026 PersoVault. Government-Grade Digital Identity System. | Developed by Rohaj Gokool Oopadhya
             </p>
           </div>
         </div>
